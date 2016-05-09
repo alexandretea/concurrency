@@ -1,2 +1,2 @@
-# threadpool
-a generic and lightweight header-only threadpool implementation
+# concurrency
+C++11 generic and lightweight header-only classes about concurrency
