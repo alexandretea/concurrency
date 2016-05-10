@@ -2,10 +2,12 @@
 # define THREADPOOL_HPP_
 
 # include <future>
-# include <shared>
+# include <type_traits>
+# include <memory>
 # include <functional>
 # include <mutex>
 # include <vector>
+# include <iostream>
 # include <queue>
 # include "SafeQueue.hpp"
 
@@ -24,9 +26,13 @@ namespace concurrency {
                 _workers.emplace_back([this]() {
                     while (true) {
                         // change to condvar with done bool
-                        task_t  task = _tasks.pop();
+                        try {
+                            task_t  task = _tasks.pop();
 
-                        task();
+                            task();
+                        } catch (std::runtime_error const& e) {
+                            exit(EXIT_SUCCESS);
+                        }
                     }
                 });
             }
@@ -34,6 +40,9 @@ namespace concurrency {
 
         ~Threadpool()
         {
+            while (not _tasks.empty()) {
+            }
+            _tasks.stop();
             _done = true;
             for (auto& worker: _workers) {
                 worker.join();
@@ -45,21 +54,23 @@ namespace concurrency {
         Threadpool&     operator=(Threadpool const& other) = delete;
 
     public:
-        template <typename RT, typename ...Types>
-        std::future<RT>
-        push(std::function<RT (Types&&...)>&& f, Types&&... args)
+        template <typename Callable, typename ...Types>
+        std::future<typename std::result_of<Callable(Types...)>::type>
+        push(Callable&& f, Types&&... args)
         {
-            std::shared_ptr<std::promise<RT>>   promise = std::make_shared();
+            using return_type = typename std::result_of<Callable(Types...)>::type;
+
+            std::shared_ptr<std::promise<return_type>>  promise(new std::promise<return_type>());
             task_t                              task = [promise, f, args...]() {
-                promise->set_value(f(args));
+                promise->set_value(f(args...));
             };
 
             {
-                std::lock_guard lock(_mutex);
+                std::lock_guard<std::mutex> lock(_mutex);
 
                 _tasks.push(task);
             }
-            return promise.get_future();
+            return promise->get_future();
         }
 
     protected:
