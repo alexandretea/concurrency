@@ -97,40 +97,7 @@ namespace concurrency {
 
             _queue.emplace(args...);
         }
-
-        T&
-        front()
-        {
-            std::lock_guard<std::mutex>   lock(_mutex);
-
-            return _queue.front();
-        }
-
-        T&
-        back()
-        {
-            std::lock_guard<std::mutex>   lock(_mutex);
-
-            return _queue.back();
-        }
-
-
-        T const&
-        front() const
-        {
-            std::lock_guard<std::mutex>   lock(_mutex);
-
-            return _queue.front();
-        }
-
-        T const&
-        back() const
-        {
-            std::lock_guard<std::mutex>   lock(_mutex);
-
-            return _queue.back();
-        }
-
+        
         void
         clear()
         {
