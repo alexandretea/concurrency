@@ -22,16 +22,16 @@ namespace concurrency {
     public:
         Threadpool(size_t nb)
         {
+            _workers.reserve(nb);
             for (size_t i = 0; i < nb; ++i) {
                 _workers.emplace_back([this]() {
                     while (true) {
-                        // change to condvar with done bool
                         try {
                             task_t  task = _tasks.pop();
 
                             task();
-                        } catch (std::runtime_error const& e) {
-                            exit(EXIT_SUCCESS);
+                        } catch (UserAbort const&) {
+                            break ;
                         }
                     }
                 });
@@ -40,10 +40,7 @@ namespace concurrency {
 
         ~Threadpool()
         {
-            while (not _tasks.empty()) {
-            }
-            _tasks.stop();
-            _done = true;
+            _tasks.abort();
             for (auto& worker: _workers) {
                 worker.join();
             }
@@ -77,7 +74,6 @@ namespace concurrency {
         std::mutex                  _mutex;
         std::vector<std::thread>    _workers;
         SafeQueue<task_t>           _tasks;
-        bool                        _done;
     };
 }
 }

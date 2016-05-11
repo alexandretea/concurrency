@@ -1,18 +1,27 @@
 #ifndef SAFEQUEUE_HPP_
 # define SAFEQUEUE_HPP_
 
+#include <stdexcept>
 #include <condition_variable>
 #include <queue>
 #include <mutex>
+#include <thread>
 
 namespace tea {
 namespace concurrency {
+
+    class UserAbort : public std::exception
+    {
+    public:
+        UserAbort() noexcept {}
+        virtual ~UserAbort() noexcept {}
+    };
 
     template <typename T>
     class SafeQueue
     {
     public:
-        SafeQueue() : _stop(false) {}
+        SafeQueue() : _abort(false) {}
         ~SafeQueue() {}
 
     public:
@@ -36,21 +45,25 @@ namespace concurrency {
             return _queue.size();
         }
 
+        /*
+        ** waits until an element can't be popped or abort is called
+        */
         T
         pop()
         {
             std::unique_lock<std::mutex>    lock(_mutex);
 
-            _cv.wait(lock, [this]()->bool {
-                return not _queue.empty() or _stop;
-            });
-            if (_stop)
-                throw std::runtime_error("user abort"); // switch to our except
+            // wait with timeout to handle abort() called just after wait
+            while (not _cv.wait_for(lock, std::chrono::milliseconds(200),
+                   [this]()->bool { return not _queue.empty() or _abort; })) {
+                check_abort();
+            }
+            check_abort();
 
             T   v(_queue.front());
 
             _queue.pop();
-            _cv.notify_one();
+            _cv.notify_all();
             return v;
         }
 
@@ -109,17 +122,39 @@ namespace concurrency {
             _queue.clear();
         }
 
+        /*
+        ** cancels every waiting operations (example: pop())
+        */
         void
-        stop()
+        abort()
         {
-            _stop = true;
+            _abort = true;
+            _cv.notify_all();
+        }
+
+        /*
+        ** allows waiting operations
+        */
+        void
+        resume()
+        {
+            _abort = false;
+        }
+
+    protected:
+        void
+        check_abort()
+        {
+            if (_abort) {
+                throw UserAbort();
+            }
         }
 
     protected:
         std::mutex              _mutex;
         std::condition_variable _cv;
         std::queue<T>           _queue;
-        bool                    _stop;
+        bool                    _abort;
     };
 }
 }
