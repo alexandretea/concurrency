@@ -30,7 +30,7 @@ namespace concurrency {
 
     public:
         bool
-        empty()
+        empty() const
         {
             std::lock_guard<std::mutex>   lock(_mutex);
 
@@ -38,7 +38,7 @@ namespace concurrency {
         }
 
         size_t
-        size()
+        size() const
         {
             std::lock_guard<std::mutex>   lock(_mutex);
 
@@ -114,6 +114,23 @@ namespace concurrency {
             return _queue.back();
         }
 
+
+        T const&
+        front() const
+        {
+            std::lock_guard<std::mutex>   lock(_mutex);
+
+            return _queue.front();
+        }
+
+        T const&
+        back() const
+        {
+            std::lock_guard<std::mutex>   lock(_mutex);
+
+            return _queue.back();
+        }
+
         void
         clear()
         {
@@ -143,7 +160,7 @@ namespace concurrency {
 
     protected:
         void
-        check_abort()
+        check_abort() const
         {
             if (_abort) {
                 throw UserAbort();
