@@ -26,13 +26,8 @@ namespace concurrency {
             for (size_t i = 0; i < nb; ++i) {
                 _workers.emplace_back([this]() {
                     while (true) {
-                        try {
-                            task_t  task = _tasks.pop();
-
-                            task();
-                        } catch (UserAbort const&) {
-                            break ;
-                        }
+                        try { _tasks.pop()(); }
+                        catch (UserAbort const&) { break ; }
                     }
                 });
             }
@@ -55,19 +50,32 @@ namespace concurrency {
         std::future<typename std::result_of<Callable(Types...)>::type>
         push(Callable&& f, Types&&... args)
         {
-            using return_type = typename std::result_of<Callable(Types...)>::type;
+            using return_type_t =
+                typename std::result_of<Callable(Types...)>::type;
+            using rt_promise_t = std::promise<return_type_t>;
 
-            std::shared_ptr<std::promise<return_type>>  promise(new std::promise<return_type>());
-            task_t                              task = [promise, f, args...]() {
+            std::shared_ptr<rt_promise_t>   promise(new rt_promise_t());
+            task_t                          task = [promise, f, args...]() {
                 promise->set_value(f(args...));
             };
-
             {
                 std::lock_guard<std::mutex> lock(_mutex);
 
                 _tasks.push(task);
             }
             return promise->get_future();
+        }
+
+        size_t
+        unsafe_pending_tasks() const
+        {
+            return _tasks.unsafe_size();
+        }
+
+        size_t
+        pending_tasks()
+        {
+            return _tasks.size();
         }
 
     protected:

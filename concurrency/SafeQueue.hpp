@@ -29,24 +29,10 @@ namespace concurrency {
         SafeQueue&      operator=(SafeQueue const& other) = delete;
 
     public:
-        bool
-        empty() const
-        {
-            std::lock_guard<std::mutex>   lock(_mutex);
-
-            return _queue.empty();
-        }
-
-        size_t
-        size() const
-        {
-            std::lock_guard<std::mutex>   lock(_mutex);
-
-            return _queue.size();
-        }
-
         /*
-        ** waits until an element can't be popped or abort is called
+        ** waits until an element can't be popped or abort() is called
+        **
+        ** throws an UserAbort exception if abort() is called while waiting
         */
         T
         pop()
@@ -97,7 +83,7 @@ namespace concurrency {
 
             _queue.emplace(args...);
         }
-        
+
         void
         clear()
         {
@@ -123,6 +109,28 @@ namespace concurrency {
         resume()
         {
             _abort = false;
+        }
+
+        bool
+        empty() const
+        {
+            std::lock_guard<std::mutex>   lock(_mutex);
+
+            return _queue.empty();
+        }
+
+        size_t
+        unsafe_size() const
+        {
+            return _queue.size();
+        }
+
+        size_t
+        size()
+        {
+            std::lock_guard<std::mutex>   lock(_mutex);
+
+            return _queue.size();
         }
 
     protected:
